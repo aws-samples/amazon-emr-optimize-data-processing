@@ -1,0 +1,198 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS BLOGS - Root Template - One Step Solution",
+  "Parameters": {
+    "S3BucketName": {
+      "Type": "String",
+      "Description": "S3 Bucket Name that will be created in your account"
+    },
+    "ClientIP": {
+      "Description": "The IP address range that can be used to connect to the EC2 instance from your local machine.It must be a valid IP CIDR range of the form x.x.x.x/x.Pls get your address using checkip.amazonaws.com or whatsmyip.org",
+      "Type": "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "Default": "0.0.0.0/0",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription": "It must be a valid IP CIDR range of the form x.x.x.x/x. Suggest to enable access to your IP address only. Pls get your address using checkip.amazonaws.com or whatsmyip.org."
+    },
+    "FirehoseDeliveryStreamName": {
+      "Type": "String",
+      "Description": "Name of the Amazon Firehose delivery stream. Default value is set to 'AWSBlogs-LambdaToFireHose'",
+      "Default": "AWSBlogs-LambdaToFireHose",
+      "AllowedValues": [
+        "AWSBlogs-LambdaToFireHose"
+      ]
+    },
+    "KinesisStreamName": {
+      "Type": "String",
+      "Description" : "Name of the Amazon Kinesis stream. Default value is set to 'AWS-Blog-BaseKinesisStream'",
+      "Default": "AWS-Blog-BaseKinesisStream",
+      "AllowedValues": [
+        "AWS-Blog-BaseKinesisStream"
+      ]
+    },
+    "Region": {
+      "Description": "AWS Region - Select us-east-1 by default.",
+      "Type": "String",
+      "Default": "us-east-1",
+      "AllowedValues": [
+        "us-east-1"
+      ]
+    },
+    "EMRClusterName": {
+      "Type": "String",
+      "Description": "ClusterName"
+    },
+    "KeyName": {
+      "Description": "Name of an existing EC2 key pair to access the Amazon EMR cluster",
+      "Type": "AWS::EC2::KeyPair::KeyName"
+    },
+    "InstanceType": {
+      "Description": "EC2 instance specs configuration",
+      "Type": "String",
+      "Default": "r4.xlarge",
+      "AllowedValues": [
+        "r4.xlarge",
+        "r4.2xlarge",
+        "r4.4xlarge"
+      ]
+    }
+  },
+  "Resources": {
+    "STEP1": {
+      "Type": "AWS::CloudFormation::Stack",
+      "Properties": {
+        "TemplateURL": {
+          "Fn::Sub": "https://s3.amazonaws.com/aws-bigdata-blog/artifacts/aws-blog-optimize-downstream-data-processing/cloudformation-templates/step1_vpc.template"
+        },
+        "Parameters": {
+          "S3BucketName": {
+            "Ref": "S3BucketName"
+          },
+          "ClientIP": {
+            "Ref": "ClientIP"
+          }
+        }
+      }
+    },
+    "STEP2": {
+      "Type": "AWS::CloudFormation::Stack",
+      "DependsOn":"STEP1",
+      "Properties": {
+        "TemplateURL": {
+          "Fn::Sub": "https://s3.amazonaws.com/aws-bigdata-blog/artifacts/aws-blog-optimize-downstream-data-processing/cloudformation-templates/step2_iam.template"
+        }
+      }
+    },
+    "STEP3": {
+      "Type": "AWS::CloudFormation::Stack",
+      "DependsOn":"STEP2",
+      "Properties": {
+        "TemplateURL": {
+          "Fn::Sub": "https://s3.amazonaws.com/aws-bigdata-blog/artifacts/aws-blog-optimize-downstream-data-processing/cloudformation-templates/step3_firehose.template"
+        },
+        "Parameters": {
+          "Role": {
+            "Fn::GetAtt": [
+              "STEP2",
+              "Outputs.FirehoseRoleArn"
+            ]
+          },
+          "S3BucketARN": {
+            "Fn::GetAtt": [
+              "STEP1",
+              "Outputs.S3BucketARN"
+            ]
+          },
+          "FirehoseDeliveryStreamName": {
+            "Ref": "FirehoseDeliveryStreamName"
+          }
+        }
+      }
+    },
+    "STEP4": {
+      "Type": "AWS::CloudFormation::Stack",
+      "DependsOn":"STEP3",
+      "Properties": {
+        "TemplateURL": {
+          "Fn::Sub": "https://s3.amazonaws.com/aws-bigdata-blog/artifacts/aws-blog-optimize-downstream-data-processing/cloudformation-templates/step4_kinesisstream.template"
+        },
+        "Parameters": {
+          "Role": {
+            "Fn::GetAtt": [
+              "STEP2",
+              "Outputs.LambdaRoleArn"
+            ]
+          },
+          "Region": {
+            "Ref": "Region"
+          },
+          "S3Bucket": {
+            "Ref": "S3BucketName"
+          },
+          "KinesisStreamName": {
+            "Ref": "KinesisStreamName"
+          }
+        }
+      }
+    },
+    "STEP5": {
+      "Type": "AWS::CloudFormation::Stack",
+      "DependsOn":"STEP4",
+      "Properties": {
+        "TemplateURL": {
+          "Fn::Sub": "https://s3.amazonaws.com/aws-bigdata-blog/artifacts/aws-blog-optimize-downstream-data-processing/cloudformation-templates/step5_emr.template"
+        },
+        "Parameters": {
+          "EMRClusterName": {
+            "Ref": "EMRClusterName"
+          },
+          "ClusterSecurityGroup": {
+            "Fn::GetAtt": [
+              "STEP1",
+              "Outputs.SecurityGroup"
+            ]
+          },
+          "ClusterSubnetID": {
+            "Fn::GetAtt": [
+              "STEP1",
+              "Outputs.SubnetID"
+            ]
+          },
+          "KeyName": {
+            "Ref": "KeyName"
+          }
+        }
+      }
+    },
+    "STEP6": {
+      "Type": "AWS::CloudFormation::Stack",
+      "DependsOn":"STEP5",
+      "Properties": {
+        "TemplateURL": {
+          "Fn::Sub": "https://s3.amazonaws.com/aws-bigdata-blog/artifacts/aws-blog-optimize-downstream-data-processing/cloudformation-templates/step6_ec2_instance.template"
+        },
+        "Parameters": {
+          "EC2SecurityGroupId": {
+            "Fn::GetAtt": [
+              "STEP1",
+              "Outputs.SecurityGroup"
+            ]
+          },
+          "KeyName": {
+            "Ref": "KeyName"
+          },
+          "EC2Subnet": {
+            "Fn::GetAtt": [
+              "STEP1",
+              "Outputs.SubnetID"
+            ]
+          },
+          "InstanceType": {
+            "Ref": "InstanceType"
+          }
+        }
+      }
+    }
+  }
+}

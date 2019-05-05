@@ -1,0 +1,43 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS BLOGS - Creating Amazon Kinesis Firehose Delivery Stream",
+  "Parameters": {
+    "Role": {
+      "Type": "String",
+      "Description" : "Fire Hose IAM Role ARN that was created as part of the Cloudformation template 2."
+
+    },
+    "S3BucketARN": {
+      "Type": "String",
+      "Description" : "S3 Bucket ARN that was created as part of the Cloudformation template 1."
+    }
+  ,
+    "FirehoseDeliveryStreamName": {
+      "Type": "String",
+      "Description" : "Name of the Amazon Firehose delivery stream. Default value is set to 'AWSBlogs-LambdaToFireHose'",
+      "Default": "AWSBlogs-LambdaToFireHose",
+      "AllowedValues": [
+        "AWSBlogs-LambdaToFireHose"
+      ]
+    }
+  },
+  "Resources": {
+    "KinesisDeliveryStreamFromLambda": {
+      "Type": "AWS::KinesisFirehose::DeliveryStream",
+      "Properties": {
+        "DeliveryStreamName": {"Ref": "FirehoseDeliveryStreamName"},
+        "DeliveryStreamType": "DirectPut",
+        "ExtendedS3DestinationConfiguration": {
+          "BufferingHints": {
+            "IntervalInSeconds": 300,
+            "SizeInMBs": 128
+          },
+          "CompressionFormat": "UNCOMPRESSED",
+          "BucketARN": {"Ref":"S3BucketARN"},
+          "Prefix": "fromfirehose/",
+          "RoleARN": {"Ref":"Role"}
+        }
+      }
+    }
+  }
+}

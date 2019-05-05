@@ -1,0 +1,106 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS BLOGS - Creating an EMR cluster",
+  "Parameters": {
+    "EMRClusterName": {
+      "Type": "String",
+      "Description": "ClusterName"
+    },
+    "ClusterSecurityGroup": {
+      "Description": "ID of an existing security-group for the for the Amazon EMR cluster",
+      "Type": "AWS::EC2::SecurityGroup::Id"
+    },
+    "ClusterSubnetID": {
+      "Description": "ID of an existing subnet for the Amazon EMR cluster",
+      "Type": "AWS::EC2::Subnet::Id"
+    },
+    "KeyName": {
+      "Description": "Name of an existing EC2 key pair to access the Amazon EMR cluster",
+      "Type": "AWS::EC2::KeyPair::KeyName"
+    }
+  },
+  "Resources": {
+    "EMRCluster": {
+      "Properties":
+      {
+        "Name": {
+          "Ref": "EMRClusterName"
+        },
+        "Applications": [{
+          "Name": "Spark"
+          },
+          {
+            "Name": "Ganglia"
+          },
+          {
+            "Name": "hive"
+          }
+        ],
+        "Configurations": [{
+          "Classification": "spark",
+          "ConfigurationProperties": {
+            "maximizeResourceAllocation": "true"
+              }
+            },
+            {
+              "Classification": "spark-hive-site",
+              "ConfigurationProperties": {
+                "hive.metastore.client.factory.class": "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory"
+              }
+            }
+        ],
+        "Instances": {
+          "CoreInstanceGroup": {
+            "InstanceCount": 2,
+            "InstanceType": "r4.xlarge",
+            "Name": "Core Instance Group"
+          },
+          "Ec2KeyName": {
+            "Ref": "KeyName"
+          },
+          "Ec2SubnetId": {"Ref": "ClusterSubnetID"},
+          "MasterInstanceGroup": {
+            "InstanceCount": 1,
+            "InstanceType": "r4.xlarge",
+            "Name": "Master Instance Group"
+          },
+          "AdditionalMasterSecurityGroups": [{
+            "Ref": "ClusterSecurityGroup"
+          }],
+          "AdditionalSlaveSecurityGroups": [{
+            "Ref": "ClusterSecurityGroup"
+          }]
+        },
+        "JobFlowRole": "EMR_EC2_DefaultRole",
+        "ServiceRole": "EMR_DefaultRole",
+        "ReleaseLabel": "emr-5.16.0",
+        "VisibleToAllUsers": "true"
+      },
+      "Type": "AWS::EMR::Cluster"
+    }
+  },
+  "Outputs": {
+    "EMRClusterMaster": {
+      "Description": "SSH Connection String to EMR Master Instance",
+      "Value" : {
+        "Fn::Join" : [
+          "",
+          [
+            "ssh hadoop@",
+            {
+              "Fn::GetAtt" : [
+                "EMRCluster",
+                "MasterPublicDNS"
+              ]
+            },
+            " -i ",
+            {
+              "Ref" : "KeyName"
+            },
+            ".pem"
+          ]
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,159 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description": "AWS BLOGS - Creating Amazon EC2 Instance For test dataset generation and loading into Kinesis.",
+  "Parameters":
+  {
+    "EC2SecurityGroupId": {
+      "Description": "Existing security Group",
+      "Type":"AWS::EC2::SecurityGroup::Id"
+    },
+    "KeyName": {
+      "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instance",
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+    },
+    "EC2Subnet": {
+      "Description": "Subnet List - Choose the Subnet",
+      "Type": "AWS::EC2::Subnet::Id"
+    },
+    "InstanceType" : {
+      "Description" : "EC2 instance specs configuration",
+      "Type" : "String",
+      "Default" : "r4.xlarge",
+      "AllowedValues" : ["r4.xlarge","r4.2xlarge", "r4.4xlarge"]
+    }
+  },
+  "Mappings": {
+    "AWSInstanceType2Arch": {
+      "r4.xlarge": {
+        "Arch": "HVM64"
+      },
+      "r4.2xlarge": {
+        "Arch": "HVM64"
+      },
+      "r4.4xlarge": {
+        "Arch": "HVM64"
+      }
+    },
+    "AWSRegionArch2AMI": {
+      "us-west-2": {
+        "HVM64": "ami-6cd6f714"
+      },
+      "us-east-1": {
+        "HVM64": "ami-1853ac65"
+      }
+    }
+  },
+  "Resources" : {
+    "EC2IAMRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "small-files-ec2role",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "root",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": {
+                "Effect": "Allow",
+                "Action": [
+                  "ec2:*",
+                  "logs:*",
+                  "kinesis:*",
+                  "firehose:*",
+                  "s3:*"
+                ],
+                "Resource": "*"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "EC2InstanceProfile" : {
+      "Type" : "AWS::IAM::InstanceProfile",
+      "DependsOn": [
+        "EC2IAMRole"
+      ],
+      "Properties" : {
+        "Path" : "/",
+        "Roles" : [
+          {
+            "Ref" : "EC2IAMRole"
+          }
+        ]
+      }
+    },
+    "EC2InstanceForDataLoadingIntoKinesis" : {
+      "Type" : "AWS::EC2::Instance",
+      "DependsOn": [
+        "EC2InstanceProfile"
+      ],
+      "Properties" : {
+        "KeyName" : { "Ref" : "KeyName" },
+        "InstanceType" : { "Ref" : "InstanceType" },
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
+        "SecurityGroupIds" : [
+          {
+          "Ref" : "EC2SecurityGroupId"
+          }
+          ],
+        "SubnetId": {"Ref": "EC2Subnet"},
+        "IamInstanceProfile": {"Ref": "EC2InstanceProfile"},
+        "Tags" : [
+          {
+          "Key" : "Name",
+          "Value" : "AWS-BLOGs-Small-Files-EC2-For-DataLoading"
+          }
+          ],
+        "UserData" : {"Fn::Base64" : { "Fn::Join" : ["",[
+          "#!/bin/bash -ex","\n",
+          "\n","sudo yum install -y java-1.8.0-openjdk-devel.x86_64","\n",
+          "\n","aws s3 cp s3://aws-bigdata-blog/artifacts/aws-blog-avoid-small-files/appjars/sample-kinesis-producer-1.0-SNAPSHOT-jar-with-dependencies.jar .","\n",
+          "\n","sudo cp /sample-kinesis-producer-1.0-SNAPSHOT-jar-with-dependencies.jar /home/ec2-user/","\n",
+          "\n","sudo chown -R ec2-user:ec2-user /home/ec2-user/sample-kinesis-producer-1.0-SNAPSHOT-jar-with-dependencies.jar","\n",
+          "\n","sudo chmod -R 755 /home/ec2-user/sample-kinesis-producer-1.0-SNAPSHOT-jar-with-dependencies.jar","\n"
+        ]]}
+        }
+      }
+      }
+  },
+  "Outputs" : {
+    "EC2Instance" : {
+      "Description" : "EC2 IP address",
+      "Value" : {
+        "Fn::Join" : [
+          "",
+          [
+            "ssh ec2-user@",
+            {
+              "Fn::GetAtt" : [
+                "EC2InstanceForDataLoadingIntoKinesis",
+                "PublicIp"
+              ]
+            },
+            " -i ",
+            {
+              "Ref" : "KeyName"
+            },
+            ".pem"
+          ]
+        ]
+      }
+    }
+  }
+}

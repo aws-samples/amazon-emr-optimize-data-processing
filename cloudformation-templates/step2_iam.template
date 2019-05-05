@@ -1,0 +1,96 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS BLOGS - IAM Roles required for the AWS Services",
+  "Resources": {
+    "LambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "small-files-lambdarole",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "root",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": {
+                "Effect": "Allow",
+                "Action": [
+                  "ec2:*",
+                  "logs:*",
+                  "kinesis:*",
+                  "firehose:*",
+                  "s3:*"
+                ],
+                "Resource": "*"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "FirehoseRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "small-files-firehoserole",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "firehose.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "root",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": {
+                "Effect": "Allow",
+                "Action": [
+                  "s3:*"
+                ],
+                "Resource": "*"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "FirehoseRoleArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "FirehoseRole",
+          "Arn"
+        ]
+      }
+    },
+    "LambdaRoleArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "LambdaRole",
+          "Arn"
+        ]
+      }
+    }
+  }
+}

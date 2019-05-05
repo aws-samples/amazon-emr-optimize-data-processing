@@ -1,0 +1,93 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS BLOGS - Kinesis Stream and a Lambda Function",
+  "Parameters": {
+    "Role": {
+      "Description": "IAM Role created for Lambda Function as part of the 2nd CF template. Get the value from the output of 2nd CF template.",
+      "Type": "String"
+    },
+    "Region": {
+      "Description": "AWS Region - Select us-east-1 by default.",
+      "Type": "String",
+      "Default": "us-east-1",
+      "AllowedValues": [
+        "us-east-1"
+      ]
+    },
+    "KinesisStreamName": {
+      "Type": "String",
+      "Description" : "Name of the Amazon Kinesis stream. Default value is set to 'AWS-Blog-BaseKinesisStream'",
+      "Default": "AWS-Blog-BaseKinesisStream",
+      "AllowedValues": [
+        "AWS-Blog-BaseKinesisStream"
+      ]
+    },
+    "S3Bucket": {
+      "Description": "Existing S3 Bucket name that was created using 1st CF template. Do not use the domain name, just provide the bucket name.",
+      "Type": "String"
+    }
+  },
+  "Resources": {
+  "BaseKinesisStream": {
+      "Type": "AWS::Kinesis::Stream",
+      "Properties": {
+        "Name": {"Ref": "KinesisStreamName"},
+        "ShardCount": "10"
+      }
+    },
+  "LambdaProcessKinesisRecords": {
+      "Type": "AWS::Lambda::Function",
+      "DependsOn": "BaseKinesisStream",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "aws-bigdata-blog",
+          "S3Key": {
+            "Fn::Sub": "artifacts/aws-blog-avoid-small-files/appjars/kinesis-lambda-1.0-SNAPSHOT-jar-with-dependencies.jar"
+          }
+        },
+        "Description": "AWS BLOGS - Processing Incoming Kinesis Records",
+        "FunctionName": "LambdaForProcessingKinesisRecords",
+        "Handler": "com.awsblogs.smallfiles.lambda.ProcessKinesisRecords",
+        "Role": {
+          "Ref": "Role"
+        },
+        "Runtime": "java8",
+        "MemorySize": 1920,
+        "Timeout": 300,
+        "Environment": {
+          "Variables": {
+            "kinesis_region": {
+              "Ref": "Region"
+            },
+            "kinesis_stream_name": {
+              "Ref": "BaseKinesisStream"
+            },
+            "s3region": {
+              "Ref": "Region"
+            },
+            "s3bucketName": {
+              "Ref": "S3Bucket"
+            },
+            "s3directorySub": "raw-from-firehose/",
+            "kinesisfirehosestream" : "AWSBlogs-LambdaToFireHose"
+          }
+        }
+      }
+    },
+  "KinesisLambdaEventTrigger": {
+    "Type" : "AWS::Lambda::EventSourceMapping",
+      "DependsOn": [
+        "BaseKinesisStream", "LambdaProcessKinesisRecords"
+      ],
+    "Properties" : {
+      "BatchSize" : 100,
+      "Enabled" : true,
+      "EventSourceArn" : {
+        "Fn::GetAtt": ["BaseKinesisStream", "Arn" ]
+        },
+      "FunctionName" : {"Ref":"LambdaProcessKinesisRecords"},
+      "StartingPosition" : "TRIM_HORIZON"
+        }
+    }
+  }
+}

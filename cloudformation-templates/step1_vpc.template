@@ -1,0 +1,190 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS BLOGS - This template creates an Amazon VPC and subnet with the required configuration.",
+  "Parameters": {
+    "S3BucketName": {
+      "Type": "String"
+    },
+    "ClientIP": {
+      "Description": "The IP address range that can be used to connect to the EC2 instance from your local machine.It must be a valid IP CIDR range of the form x.x.x.x/x.Pls get your address using checkip.amazonaws.com or whatsmyip.org",
+      "Type": "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "Default": "0.0.0.0/0",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription": "It must be a valid IP CIDR range of the form x.x.x.x/x. Suggest to enable access to your IP address only. Pls get your address using checkip.amazonaws.com or whatsmyip.org."
+    }
+  },
+  "Resources": {
+    "VPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true,
+        "InstanceTenancy": "default",
+        "Tags": [{
+          "Key": "Name",
+          "Value": "awsblog-small-files-vpc"
+        }]
+      }
+    },
+    "PublicSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "CidrBlock": "10.0.1.0/24",
+        "MapPublicIpOnLaunch": "True",
+        "Tags": [{
+          "Key": "Name",
+          "Value": "awsblog-small-files-subnet"
+        }]
+      }
+    },
+    "InternetGateway": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {
+        "Tags": [{
+          "Key": "Name",
+          "Value": "awsblog-small-files-gateway"
+        }]
+      }
+    },
+    "MyGatewayAttachment": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "InternetGatewayId": {
+          "Ref": "InternetGateway"
+        },
+        "VpcId": {
+          "Ref": "VPC"
+        }
+      }
+    },
+    "PublicRouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "VPC"
+        }
+      }
+    },
+    "PublicRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "PublicRouteTable"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "InternetGateway"
+        }
+      },
+      "DependsOn": [
+        "MyGatewayAttachment"
+      ]
+    },
+    "PublicSubnetRouteAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "PublicRouteTable"
+        },
+        "SubnetId": {
+          "Ref": "PublicSubnet"
+        }
+      }
+    },
+    "InstanceSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "CloudFormationGroup",
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "SecurityGroupIngress": [{
+          "IpProtocol": "tcp",
+          "CidrIp": { "Ref" : "ClientIP"},
+          "FromPort": "22",
+          "ToPort": "22"
+        }],
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "IpProtocol": "-1",
+            "FromPort": -1,
+            "ToPort": -1
+          }
+        ],
+        "Tags": [{
+          "Key": "Name",
+          "Value": "awsblog-small-files-securitygroup"
+        }]
+      }
+    },
+    "VPCDefaultSecurityGroupIngress": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Fn::GetAtt": ["InstanceSecurityGroup", "GroupId"]
+        },
+        "IpProtocol": "-1",
+        "FromPort": "-1",
+        "ToPort": "-1",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "InstanceSecurityGroup",
+            "GroupId"
+          ]
+        }
+      }
+    },
+    "S3Bucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Ref": "S3BucketName"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "StackName": {
+      "Value": {
+        "Ref": "AWS::StackName"
+      }
+    },
+    "SubnetID": {
+      "Description": "Use this subnet ID for your other AWS resources",
+      "Value": {
+        "Ref": "PublicSubnet"
+      }
+    },
+    "SecurityGroup": {
+      "Description": "Use this security group ID for your other AWS resources.",
+      "Value": {
+        "Fn::GetAtt": ["InstanceSecurityGroup", "GroupId"]
+      }
+    },
+    "VPCID": {
+      "Description": "Use this VPC ID for your other AWS resources..",
+      "Value": {
+        "Ref": "VPC"
+      }
+    },
+    "S3BucketDomain": {
+      "Description": "S3 Bucket Domain that was created",
+      "Value": {
+        "Fn::GetAtt": ["S3Bucket", "DomainName" ]
+      }
+    },
+    "S3BucketARN": {
+      "Description": "S3 Bucket ARN that was created",
+      "Value": {
+        "Fn::GetAtt": ["S3Bucket", "Arn" ]
+      }
+    }
+  }
+}
