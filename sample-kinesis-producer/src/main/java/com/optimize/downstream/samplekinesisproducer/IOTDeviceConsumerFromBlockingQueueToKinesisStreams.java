@@ -37,8 +37,7 @@ public class IOTDeviceConsumerFromBlockingQueueToKinesisStreams implements Runna
     {
         long threadId = Thread.currentThread().getId();
         System.out.println("Thread # " + threadId + " is doing this task");
-
-        while(true)
+        while(!inputQueue.isEmpty())
         {
             try {
                 IOTDevice deviceMessage = inputQueue.take();
@@ -58,6 +57,7 @@ public class IOTDeviceConsumerFromBlockingQueueToKinesisStreams implements Runna
                 e.printStackTrace();
             }
         }
+        System.exit(0);
     }
     private void flush() {
         System.out.println("Sending a record to Kinesis Stream with " + entries.size() + " messages grouped together.");
