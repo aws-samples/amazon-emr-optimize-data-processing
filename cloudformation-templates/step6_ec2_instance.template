@@ -123,7 +123,7 @@
         "UserData" : {"Fn::Base64" : { "Fn::Join" : ["",[
           "#!/bin/bash -ex","\n",
           "\n","sudo yum install -y java-1.8.0-openjdk-devel.x86_64","\n",
-          "\n","aws s3 cp s3://aws-bigdata-blog/artifacts/aws-blog-avoid-small-files/appjars/sample-kinesis-producer-1.0-SNAPSHOT-jar-with-dependencies.jar .","\n",
+          "\n","aws s3 cp s3://aws-bigdata-blog/artifacts/aws-blog-optimize-downstream-data-processing/appjars/sample-kinesis-producer-1.0-SNAPSHOT-jar-with-dependencies.jar .","\n",
           "\n","sudo cp /sample-kinesis-producer-1.0-SNAPSHOT-jar-with-dependencies.jar /home/ec2-user/","\n",
           "\n","sudo chown -R ec2-user:ec2-user /home/ec2-user/sample-kinesis-producer-1.0-SNAPSHOT-jar-with-dependencies.jar","\n",
           "\n","sudo chmod -R 755 /home/ec2-user/sample-kinesis-producer-1.0-SNAPSHOT-jar-with-dependencies.jar","\n"
